@@ -1,0 +1,2 @@
+# flutter-ajakuma-app
+あじゃくまくんのアプリです
