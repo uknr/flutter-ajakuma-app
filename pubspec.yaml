@@ -13,7 +13,8 @@ dependencies:
   flutter_animate: ^4.2.0
   google_fonts: ^4.0.4
   cupertino_icons: ^1.0.8
-  logger: ^2.0.2 # バージョンは最新のものを使ってください
+  logger: ^2.0.2
+  mqtt_client: ^10.1.0 
   
 dev_dependencies:
   flutter_test:

@@ -1,9 +1,11 @@
-
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter_application_ajakuma/services/temperature_service.dart';
+import 'package:flutter_application_ajakuma/services/mqtt_service.dart';
 import 'package:flutter_application_ajakuma/constants/app_constants.dart';
 import 'package:flutter_application_ajakuma/widgets/animated_kuma.dart';
+
 
 final logger = Logger();
 
@@ -21,47 +23,108 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
   bool isDancing = false;
   bool isStoping = false;
 
+  late final MqttService mqttService;
+  StreamSubscription<String>? _tempSub;
+
   final TemperatureService service = TemperatureService(kDeviceIpAddress);
 
   @override
   void initState() {
     super.initState();
-    fetchTemperature();
+    mqttService = MqttService(
+      broker: kMqttBroker,
+      port: kMqttWsPort,
+      username: kMqttUser,
+      password: kMqttPassword,
+    );
+    connectToMqtt();
   }
 
-  Future<void> fetchTemperature() async {
-    if (isLoading) return;
-    setState(() => isLoading = true);
+  Future<void> connectToMqtt() async {
+    await mqttService.connect();
 
-    try {
-      final temp = await service.fetchTemperature();
-      setState(() {
-        temperatureValue = temp;
-        temperatureText = temp != null ? "${temp.toStringAsFixed(1)} ℃" : "取得失敗";
-        isDancing = (temperatureValue ?? 0) >= 28;
-      });
-    } catch (e) {
-      setState(() => temperatureText = "通信失敗: $e");
-    } finally {
-      setState(() => isLoading = false);
-    }
+    // 温度トピックを購読
+    final stream = mqttService.subscribe('temperature/topic');
+    _tempSub = stream.listen((message) {
+      final temp = double.tryParse(message);
+      if (temp != null) {
+        setState(() {
+          temperatureValue = temp;
+          temperatureText = "${temp.toStringAsFixed(1)} ℃";
+          isDancing = temp >= 28 && !isStoping;
+          if(temp < 28){
+            isStoping = false;
+          }
+        });
+      } else {
+        logger.w("数値変換できない温度: $message");
+      }
+    });  
   }
 
-  Future<void> fetchStopMotion() async {
-    if (isStoping) return;
-    setState(() => isStoping = true);
+  void requestTemperature() {
+    logger.d("依頼発生");
+    // if (isLoading) return;
+    // setState(() => isLoading = true);
+    mqttService.publish('request/temperature', 'get');
+    setState(() {
+      temperatureText = "リクエスト中...";
+    });
+  }
 
-    try {
-      await service.sendStopSignal();
+  void sendStopSignal() {
+    mqttService.publish('cmd/ajakuma', 'stop');
+    setState(() {
+      isStoping = true;
+      temperatureText = "すとっぷ中";
+    });
+    Future.delayed(const Duration(seconds: 2), () {
       setState(() {
+        isStoping = false;
         isDancing = false;
-        temperatureText = "すとっぷ中";
       });
-    } catch (e) {
-      setState(() => temperatureText = "通信失敗: $e");
-    } finally {
-      setState(() => isStoping = false);
-    }
+    });
+  }
+
+  // Future<void> fetchTemperature() async {
+  //   if (isLoading) return;
+  //   setState(() => isLoading = true);
+
+  //   try {
+  //     final temp = await service.fetchTemperature();
+  //     setState(() {
+  //       temperatureValue = temp;
+  //       temperatureText = temp != null ? "${temp.toStringAsFixed(1)} ℃" : "取得失敗";
+  //       isDancing = (temperatureValue ?? 0) >= 28;
+  //     });
+  //   } catch (e) {
+  //     setState(() => temperatureText = "通信失敗: $e");
+  //   } finally {
+  //     setState(() => isLoading = false);
+  //   }
+  // }
+
+  // Future<void> fetchStopMotion() async {
+  //   if (isStoping) return;
+  //   setState(() => isStoping = true);
+
+  //   try {
+  //     await service.sendStopSignal();
+  //     setState(() {
+  //       isDancing = false;
+  //       temperatureText = "すとっぷ中";
+  //     });
+  //   } catch (e) {
+  //     setState(() => temperatureText = "通信失敗: $e");
+  //   } finally {
+  //     setState(() => isStoping = false);
+  //   }
+  // }
+
+  @override
+  void dispose() {
+    _tempSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -121,10 +184,12 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                         ),
                       ),
                       const SizedBox(height: 8,),
-                      Text(temperatureText, style: const TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepOrange,
+                      Text(
+                          temperatureText, 
+                          style: const TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.deepOrange,
                         )
                       ),
                     ],
@@ -151,32 +216,35 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: isLoading ? null : fetchTemperature,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(8))
-                        ),
-                        child: isLoading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Text("更新"),
-                      ),
-                    ),
+                    // Expanded(
+                    //   child: ElevatedButton(
+                    //     onPressed: requestTemperature,
+                    //     style: ElevatedButton.styleFrom(
+                    //       padding: const EdgeInsets.symmetric(vertical: 16),
+                    //       shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(8))
+                    //     ),
+                    //     child: const Text("更新"),
+                    //     // child: isLoading
+                    //     //   ? const SizedBox(
+                    //     //       width: 16,
+                    //     //       height: 16,
+                    //     //       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    //     //     )
+                    //     //   : const Text("更新"),
+                    //   ),
+                    // ),
                     const SizedBox(width: 8),
                     if (isDancing) ...[
                       Expanded(child: 
                         ElevatedButton(
-                          onPressed: isStoping ? null : fetchStopMotion,
+                          onPressed: isStoping ? null : sendStopSignal,
                           child: isStoping
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2
+                                  ),
                                 )
                               : const Text("止める"),
                         ),
@@ -192,7 +260,7 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                           });
                         }, 
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 36),
                           backgroundColor: Colors.deepPurple,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
