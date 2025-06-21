@@ -1,0 +1,1 @@
+const String kDeviceIpAddress = "http://192.168.101.3";
