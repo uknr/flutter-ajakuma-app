@@ -233,7 +233,7 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                     //   ),
                     // ),
                     const SizedBox(width: 8),
-                    if (!isDancing) ...[
+                    if (isDancing) ...[
                       Expanded(child: 
                         ElevatedButton(
                           onPressed: isStoping ? null : sendStopSignal,
