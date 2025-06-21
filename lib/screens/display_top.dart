@@ -80,7 +80,6 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
     });
     Future.delayed(const Duration(seconds: 2), () {
       setState(() {
-        isStoping = false;
         isDancing = false;
       });
     });
@@ -241,7 +240,7 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                           child: isStoping
                               ? const SizedBox(
                                   width: 16,
-                                  height: 16,
+                                  height: 36,
                                   child: CircularProgressIndicator(
                                     color: Colors.white, strokeWidth: 2
                                   ),
@@ -254,11 +253,30 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          // TODO 音楽変更しょり
-                          setState(() {
-                            temperatureText = "音楽へんこう！";
-                          });
-                        }, 
+                          showDialog(
+                            context: context,
+                            barrierDismissible: true, // 外側タップで閉じられる
+                            builder: (BuildContext context) {
+                              return AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                backgroundColor: Colors.white,
+                                content: const Text(
+                                  "もうすこしまっててね",
+                                  style: TextStyle(fontSize: 18),
+                                  textAlign: TextAlign.center,
+                                ),
+                                actions: [
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: () => Navigator.of(context).pop(),
+                                      child: const Text("OK"),
+                                    ),
+                                  )
+                                ],
+                              );
+                            },
+                          );
+                        },
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 36),
                           backgroundColor: Colors.deepPurple,
