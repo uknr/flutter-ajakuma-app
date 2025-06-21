@@ -233,19 +233,28 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                     //   ),
                     // ),
                     const SizedBox(width: 8),
-                    if (isDancing) ...[
+                    if (!isDancing) ...[
                       Expanded(child: 
                         ElevatedButton(
                           onPressed: isStoping ? null : sendStopSignal,
+                            style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 36),
+                            backgroundColor: Colors.deepPurple,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
                           child: isStoping
                               ? const SizedBox(
-                                  width: 16,
-                                  height: 36,
                                   child: CircularProgressIndicator(
                                     color: Colors.white, strokeWidth: 2
                                   ),
                                 )
-                              : const Text("止める"),
+                              : const Text("とめる",
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w500,
+                                ),
+                              ),
                         ),
                       ),
                     const SizedBox(width: 8),
@@ -253,28 +262,62 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
+                          String selectedMusic = 'mori_kuma'; // 初期選択（森のくまさん）
                           showDialog(
                             context: context,
-                            barrierDismissible: true, // 外側タップで閉じられる
                             builder: (BuildContext context) {
                               return AlertDialog(
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                backgroundColor: Colors.white,
-                                content: const Text(
-                                  "もうすこしまっててね",
-                                  style: TextStyle(fontSize: 18),
-                                  textAlign: TextAlign.center,
+                                title: const Text("音楽を選んでね"),
+                                content: StatefulBuilder(
+                                  builder: (BuildContext context, StateSetter setState) {
+                                    return Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        RadioListTile(
+                                          title: const Text("森のくまさん"),
+                                          value: 'mori_kuma',
+                                          groupValue: selectedMusic,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              selectedMusic = value!;
+                                            });
+                                          },
+                                        ),
+                                        RadioListTile(
+                                          title: const Text("あつ森のテーマ"),
+                                          value: 'atsumori',
+                                          groupValue: selectedMusic,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              selectedMusic = value!;
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
                                 actions: [
-                                  Center(
-                                    child: TextButton(
-                                      onPressed: () => Navigator.of(context).pop(),
-                                      child: const Text("OK"),
-                                    ),
-                                  )
+                                  TextButton(
+                                    child: const Text("キャンセル"),
+                                    onPressed: () => Navigator.of(context).pop(),
+                                  ),
+                                  ElevatedButton(
+                                    child: const Text("へんこう"),
+                                    onPressed: () {
+                                      // NodeMCU に音楽変更コマンド送信
+                                      mqttService.publish('cmd/ajakuma', 'music:$selectedMusic');
+
+                                      Navigator.of(context).pop(); // ダイアログ閉じる
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text("音楽を変更しました: $selectedMusic")),
+                                      );
+                                    },
+                                  ),
                                 ],
                               );
-                            },
+                            }, 
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -283,7 +326,12 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text("おんがくへんこう")
+                        child: const Text("おんがくへんこう",
+                              style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w500,
+                              ),
+                          ),
                         ),
                       ),
                     ],
