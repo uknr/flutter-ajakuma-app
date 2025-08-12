@@ -1,6 +1,7 @@
 import 'package:flutter_application_ajakuma/screens/display_top.dart';
 import 'package:mqtt_client/mqtt_browser_client.dart';
 import 'package:mqtt_client/mqtt_client.dart';
+import 'package:uuid/uuid.dart';
 
 class MqttService {
   final String broker;
@@ -9,6 +10,7 @@ class MqttService {
   final String password;
 
   late final MqttBrowserClient _client;
+  final String clientId = const Uuid().v4();
 
   MqttService({
     required this.broker,
@@ -17,7 +19,7 @@ class MqttService {
     required this.password,
   }) {
     logger.d('wss://$broker');
-    _client = MqttBrowserClient('wss://$broker/mqtt', 'flutter_client');
+    _client = MqttBrowserClient('wss://$broker/mqtt', clientId);
     _client.port = port;
     // _client.secure = true;
     _client.keepAlivePeriod = 20;
