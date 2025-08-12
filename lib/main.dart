@@ -12,7 +12,7 @@ class TempApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '温度表示アプリ',
+      title: 'あじゃくまくん',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         textTheme: GoogleFonts.kosugiMaruTextTheme(),

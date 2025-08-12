@@ -22,6 +22,7 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
   bool isLoading = false;
   bool isDancing = false;
   bool isStoping = false;
+  bool isWarning = false;
 
   late final MqttService mqttService;
   StreamSubscription<String>? _tempSub;
@@ -48,10 +49,16 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
     _tempSub = stream.listen((message) {
       final temp = double.tryParse(message);
       if (temp != null) {
+        // 温度に応じてステータスを更新
         setState(() {
           temperatureValue = temp;
+          // 温度表示
           temperatureText = "${temp.toStringAsFixed(1)} ℃";
+          // 28度以上かつ、ストップ命令がない場合true
           isDancing = temp >= 28 && !isStoping;
+          // 26度以上かつ28度未満かつ、ストップ命令がない場合true
+          isWarning = 26 <= temp && temp < 28 && !isStoping;
+          // 一度ストップしてから再度28度を下回るまで、ストップ命令はリセットしない
           if(temp < 28){
             isStoping = false;
           }
@@ -62,6 +69,32 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
     });  
   }
 
+  // [あじゃくまくんイメチェン機能]背景色を温度によって変える
+  // TODO:初回は固定でconst Color.fromARGB(255, 255, 220, 48)を返すようにしてください
+  Color getBackgroundColor() {
+    if (!isDancing && !isWarning) {
+      return const Color.fromARGB(255, 222, 235, 240);
+    } else if (isWarning) {
+      return const Color.fromARGB(255, 255, 220, 48);
+    } else {
+      return const Color.fromARGB(255, 240, 118, 18);
+    }
+  }
+
+
+  // [あじゃくまくんイメチェン機能]背景色を温度によって変える
+  // TODO:初回はisWarningによる文字の変更はないでもいいしあるでもいい
+  String getComment() {
+    if (!isDancing && !isWarning) {
+      return '／ すりーぴんぐ… ＼';
+    } else if (isWarning) {
+      return '／ そわそわ… ＼';
+    } else {
+      return '／ だんしんぐ！ ＼';
+    }
+  }
+
+  // 温度取得命令(使ってない気がする)
   void requestTemperature() {
     logger.d("依頼発生");
     // if (isLoading) return;
@@ -72,6 +105,7 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
     });
   }
 
+  // ストップ命令
   void sendStopSignal() {
     mqttService.publish('cmd/ajakuma', 'stop');
     setState(() {
@@ -85,41 +119,6 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
     });
   }
 
-  // Future<void> fetchTemperature() async {
-  //   if (isLoading) return;
-  //   setState(() => isLoading = true);
-
-  //   try {
-  //     final temp = await service.fetchTemperature();
-  //     setState(() {
-  //       temperatureValue = temp;
-  //       temperatureText = temp != null ? "${temp.toStringAsFixed(1)} ℃" : "取得失敗";
-  //       isDancing = (temperatureValue ?? 0) >= 28;
-  //     });
-  //   } catch (e) {
-  //     setState(() => temperatureText = "通信失敗: $e");
-  //   } finally {
-  //     setState(() => isLoading = false);
-  //   }
-  // }
-
-  // Future<void> fetchStopMotion() async {
-  //   if (isStoping) return;
-  //   setState(() => isStoping = true);
-
-  //   try {
-  //     await service.sendStopSignal();
-  //     setState(() {
-  //       isDancing = false;
-  //       temperatureText = "すとっぷ中";
-  //     });
-  //   } catch (e) {
-  //     setState(() => temperatureText = "通信失敗: $e");
-  //   } finally {
-  //     setState(() => isStoping = false);
-  //   }
-  // }
-
   @override
   void dispose() {
     _tempSub?.cancel();
@@ -128,19 +127,21 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
+    // ロゴ設定。28度を超えたら背景色が濃くなるため、白文字ロゴにする
+    dynamic imagPath = isDancing ? 'assets/images/AjaKuma_logo_dancing.png' : 'assets/images/AjaKuma_logo.png';
     final logoImage = Image.asset(
-      'assets/images/AjaKuma_logo.png',
+      imagPath,
       width: 500,
       height: 200,
       fit: BoxFit.contain
     );
 
     return Scaffold(
-      backgroundColor: Colors.amber[50],
+      backgroundColor: getBackgroundColor(),
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(200),
         child: AppBar(
-          backgroundColor: Colors.amber[50],
+          backgroundColor:getBackgroundColor(),
           elevation: 0,
           flexibleSpace: Center(
             child: Padding(
@@ -201,13 +202,13 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                 child: Center(
                   child: SizedBox(
                     width: constraints.maxWidth * 0.5,
-                    child: TemperatureImage(isDancing: isDancing),
+                    child: TemperatureImage(isDancing: isDancing,isWarning: isWarning),
                   ),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                isDancing ? "だんしんぐ！" : "すりーぴんぐ…",
+                getComment(),
                 style: const TextStyle(fontSize: 24),
               ),
               const SizedBox(height: 16),
@@ -239,7 +240,7 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                           onPressed: isStoping ? null : sendStopSignal,
                             style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 36),
-                            backgroundColor: Colors.deepPurple,
+                            backgroundColor: const Color.fromARGB(255, 184, 144, 255),
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
@@ -322,7 +323,7 @@ class _TempDisplayScreenState extends State<TempDisplayScreen> with TickerProvid
                         },
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 36),
-                          backgroundColor: Colors.deepPurple,
+                          backgroundColor: const Color.fromARGB(255, 184, 144, 255),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
